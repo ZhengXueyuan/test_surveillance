@@ -1,0 +1,90 @@
+# 组件运行等级调度计划
+# 定义每个组件在一天中不同时间段应达到的运行等级
+#
+# 等级定义：
+#   1 = started       - 进程已启动，基本初始化完成
+#   2 = connected     - 已连接外部系统（数据库、消息队列、交易所等）
+#   3 = partial       - 部分功能可用（如仅接收数据但不交易）
+#   4 = fully_operational - 完全正常，所有功能可用
+
+version: "1.0"
+timezone: "Asia/Shanghai"
+market_calendar: "CN_STOCK"
+
+components:
+  # ==================== 交易引擎 ====================
+  - component_id: "trade_engine"
+    description: "核心交易引擎"
+
+    rules:
+      - name: "pre_market"
+        start_time: "08:30"
+        end_time: "09:15"
+        expected_level: 3
+        description: "盘前准备，加载数据"
+
+      - name: "continuous_trading"
+        start_time: "09:15"
+        end_time: "11:30"
+        expected_level: 4
+        description: "上午交易时段"
+
+      - name: "lunch_break"
+        start_time: "11:30"
+        end_time: "13:00"
+        expected_level: 3
+        description: "午间休市"
+
+      - name: "afternoon_trading"
+        start_time: "13:00"
+        end_time: "15:00"
+        expected_level: 4
+        description: "下午交易时段"
+
+      - name: "post_market"
+        start_time: "15:00"
+        end_time: "15:30"
+        expected_level: 2
+        description: "收盘后处理"
+
+      - name: "night_standby"
+        start_time: "15:30"
+        end_time: "08:30"
+        expected_level: 1
+        description: "非交易时段"
+
+    non_trading_day_level: 1
+
+  # ==================== 风控检查器 ====================
+  - component_id: "risk_checker"
+    description: "实时风险检查模块"
+
+    rules:
+      - name: "market_hours"
+        start_time: "08:30"
+        end_time: "15:30"
+        expected_level: 4
+
+      - name: "off_hours"
+        start_time: "15:30"
+        end_time: "08:30"
+        expected_level: 2
+
+    non_trading_day_level: 1
+
+  # ==================== 市场数据接入 ====================
+  - component_id: "market_data_feeder"
+    description: "市场数据接入网关"
+
+    rules:
+      - name: "data_session"
+        start_time: "08:00"
+        end_time: "17:00"
+        expected_level: 4
+
+      - name: "night_session"
+        start_time: "17:00"
+        end_time: "08:00"
+        expected_level: 2
+
+    non_trading_day_level: 2

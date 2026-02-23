@@ -979,6 +979,21 @@ pyyaml>=6.0.1
 httpx>=0.25.0
 ```
 
+### 外部服务
+- **Redis**：系统依赖一个可访问的 Redis 实例（版本 ≥ 6.0）。
+  - 开发时可通过以下任一方式提供：
+    - 本地运行的 Redis 服务（`redis-server`）
+    - Docker 容器（建议使用 `docker-compose.yml` 启动）
+  - 连接地址通过环境变量 `REDIS_URL` 配置，默认为 `redis://localhost:6379`
+
+### 配置方式
+- 所有外部依赖（Redis、计划文件路径等）必须通过 **环境变量或配置文件** 注入，禁止硬编码。
+- 示例 `.env` 文件应包含：
+  ```env
+  REDIS_URL=redis://localhost:6379
+  FILE_MONITOR_PLAN_PATH=./config/file_monitor_plan.yaml
+  LEVEL_SCHEDULE_PATH=./config/level_schedule.yaml
+
 ---
 
 ## 6. 启动与测试流程

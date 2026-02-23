@@ -1,0 +1,64 @@
+# 文件监控计划配置
+# 描述每个组件依赖的输入文件和产生的输出文件及其预期更新周期
+
+version: "1.0"
+updated_at: "2026-02-23"
+
+components:
+  # ==================== 交易引擎 ====================
+  - component_id: "trade_engine"
+    description: "核心交易引擎，处理订单和成交"
+
+    input_files:
+      - path: "/data/market_data.csv"
+        description: "实时市场数据"
+        expected_update_cron: "0 */5 * * *"
+        grace_period_sec: 60
+
+      - path: "/data/reference_data.json"
+        description: "参考数据（股票代码、价格限制等）"
+        expected_update_cron: "0 7 * * 1-5"
+        grace_period_sec: 300
+
+    output_files:
+      - path: "/logs/trade_engine.log"
+        description: "交易引擎运行日志"
+        expected_update_cron: "*/1 * * * *"
+        grace_period_sec: 30
+
+      - path: "/output/trades.csv"
+        description: "成交记录"
+        expected_update_cron: "*/5 * * * *"
+        grace_period_sec: 60
+
+  # ==================== 风控检查器 ====================
+  - component_id: "risk_checker"
+    description: "实时风险检查模块"
+
+    input_files:
+      - path: "/config/risk_rules.json"
+        description: "风控规则配置"
+        expected_update_cron: "0 2 * * *"
+        grace_period_sec: 600
+
+    output_files:
+      - path: "/logs/risk_alerts.log"
+        description: "风控告警日志"
+        expected_update_cron: "*/1 * * * *"
+        grace_period_sec: 60
+
+  # ==================== 市场数据接入 ====================
+  - component_id: "market_data_feeder"
+    description: "市场数据接入网关"
+
+    input_files:
+      - path: "/config/exchange_endpoints.json"
+        description: "交易所接口配置"
+        expected_update_cron: "0 1 * * 1"
+        grace_period_sec: 3600
+
+    output_files:
+      - path: "/data/market_data.csv"
+        description: "标准化市场数据"
+        expected_update_cron: "*/30 * * * * *"
+        grace_period_sec: 15

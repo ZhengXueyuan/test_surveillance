@@ -1,0 +1,25 @@
+# Web 框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# 数据验证
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Redis
+redis>=5.0.0
+
+# 定时任务
+apscheduler>=3.10.0
+
+# Cron 解析
+croniter>=2.0.0
+
+# 时区处理
+pytz>=2023.3
+
+# YAML 解析
+pyyaml>=6.0.1
+
+# HTTP 客户端（模拟组件使用）
+httpx>=0.25.0
