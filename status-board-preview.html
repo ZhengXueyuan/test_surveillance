@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>交易组件监控面板 - 预览版</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background-color: #f9fafb;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2d3748;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      justify-content: space-between;
+    }
+    input[type="text"] {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      width: 200px;
+    }
+    button {
+      padding: 6px 12px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #4338ca;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #edf2f7;
+    }
+    th {
+      background-color: #f8fafc;
+      font-weight: 600;
+      color: #4a5568;
+    }
+    tr:hover {
+      background-color: #f8fafc;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .ok { background-color: #10b981; }      /* green */
+    .error { background-color: #ef4444; }   /* red */
+    .warning { background-color: #f59e0b; } /* amber */
+    .healthy::before { content: "🟢"; }
+    .unhealthy::before { content: "🔴"; }
+    .timestamp {
+      font-size: 0.85em;
+      color: #718096;
+    }
+    .file-path {
+      font-family: monospace;
+      background: #f1f5f9;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+    .last-update {
+      text-align: right;
+      font-size: 0.9em;
+      color: #64748b;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="container">
+      <h1>交易组件监控面板</h1>
+
+      <div class="controls">
+        <input v-model="searchQuery" placeholder="搜索组件 ID..." />
+        <button @click="refresh">🔄 手动刷新</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>组件 ID</th>
+            <th>心跳状态</th>
+            <th>文件更新</th>
+            <th>运行等级</th>
+            <th>整体健康</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="comp in filteredComponents" :key="comp.id">
+            <td>{{ comp.id }}</td>
+            <td>
+              <span :class="['status-dot', comp.heartbeat.ok ? 'ok' : 'error']"></span>
+              {{ comp.heartbeat.ok ? '存活' : '宕机' }}
+              <div class="timestamp" v-if="comp.heartbeat.lastSeen">
+                {{ formatTime(comp.heartbeat.lastSeen) }}
+              </div>
+            </td>
+            <td>
+              <template v-if="comp.file_status">
+                <div v-for="(file, idx) in getAllFiles(comp.file_status)" :key="idx">
+                  <span :class="['status-dot', file.ok ? 'ok' : 'error']"></span>
+                  {{ file.type }}:
+                  <span class="file-path" :title="file.path">{{ getFileName(file.path) }}</span>
+                  <div class="timestamp" v-if="file.last_mtime">
+                    {{ formatTime(file.last_mtime) }}
+                  </div>
+                </div>
+              </template>
+              <span v-else>—</span>
+            </td>
+            <td>
+              <span v-if="comp.level_status">
+                <span :class="['status-dot', comp.level_status.compliant ? 'ok' : 'error']"></span>
+                实际: {{ comp.level_status.observed_level || comp.level_status.declared_level || '?' }} / 
+                期望: {{ comp.level_status.expected_level }}
+                {{ comp.level_status.compliant ? '合规' : '违规' }}
+              </span>
+              <span v-else>—</span>
+            </td>
+            <td :class="comp.overallHealthy ? 'healthy' : 'unhealthy'"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="last-update">最后更新: {{ lastUpdateTime }}</div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue
+
+    // 模拟你当前的真实数据
+    const mockData = {
+      "market_data_feeder": {
+        heartbeat: { ok: true, lastSeen: "2026-02-23T17:32:00Z" },
+        file_status: {
+          input_files: {
+            "./data/market_data.csv": {
+              ok: true,
+              last_mtime: "2026-02-23T17:31:45Z",
+              expected_cron: "*/5 * * * *"
+            }
+          },
+          output_files: {}
+        },
+        level_status: {
+          expected_level: 2,
+          declared_level: 2,
+          compliant: true
+        }
+      },
+      "risk_checker": {
+        heartbeat: { ok: true, lastSeen: "2026-02-23T17:32:10Z" },
+        file_status: {
+          input_files: {
+            "./data/risk_input.txt": {
+              ok: false,
+              last_mtime: "2026-02-23T17:20:00Z",
+              error: "File not updated in time"
+            }
+          },
+          output_files: {}
+        },
+        level_status: {
+          expected_level: 2,
+          declared_level: 4,
+          compliant: false
+        }
+      },
+      "trade_engine": {
+        heartbeat: { ok: true, lastSeen: "2026-02-23T17:32:05Z" },
+        file_status: {
+          input_files: {
+            "./data/trade_input.json": {
+              ok: false,
+              last_mtime: "2026-02-23T17:15:00Z",
+              error: "Stale file"
+            }
+          },
+          output_files: {}
+        },
+        level_status: {
+          expected_level: 1,
+          declared_level: 4,
+          compliant: false
+        }
+      }
+    }
+
+    createApp({
+      setup() {
+        const searchQuery = ref('')
+        const lastUpdateTime = ref('—')
+        const rawData = ref({})
+
+        const components = computed(() => {
+          return Object.entries(rawData.value).map(([id, data]) => {
+            const heartbeat = data.heartbeat || { ok: false }
+            const file_status = data.file_status
+            const level_status = data.level_status
+
+            // 计算整体健康
+            const hbOk = heartbeat.ok === true
+            const fileOk = !file_status || (
+              Object.values(file_status.input_files || {}).every(f => f.ok) &&
+              Object.values(file_status.output_files || {}).every(f => f.ok)
+            )
+            const levelOk = level_status?.compliant !== false
+
+            return {
+              id,
+              heartbeat,
+              file_status,
+              level_status,
+              overallHealthy: hbOk && fileOk && levelOk
+            }
+          }).sort((a, b) => (b.overallHealthy - a.overallHealthy)) // 异常在前
+        })
+
+        const filteredComponents = computed(() => {
+          return components.value.filter(comp =>
+            comp.id.toLowerCase().includes(searchQuery.value.toLowerCase())
+          )
+        })
+
+        const getAllFiles = (fs) => {
+          const files = []
+          if (fs.input_files) {
+            for (const [path, info] of Object.entries(fs.input_files)) {
+              files.push({ ...info, path, type: '输入' })
+            }
+          }
+          if (fs.output_files) {
+            for (const [path, info] of Object.entries(fs.output_files)) {
+              files.push({ ...info, path, type: '输出' })
+            }
+          }
+          return files
+        }
+
+        const getFileName = (path) => path.split('/').pop()
+
+        const formatTime = (isoStr) => {
+          return new Date(isoStr).toLocaleString('zh-CN')
+        }
+
+        const fetchData = () => {
+          // 使用 mock 数据（替换为真实 fetch 逻辑即可对接后端）
+          rawData.value = mockData
+          lastUpdateTime.value = new Date().toLocaleTimeString('zh-CN')
+        }
+
+        const refresh = () => {
+          fetchData()
+        }
+
+        onMounted(() => {
+          fetchData()
+          setInterval(fetchData, 10000)
+        })
+
+        return {
+          searchQuery,
+          lastUpdateTime,
+          filteredComponents,
+          getAllFiles,
+          getFileName,
+          formatTime,
+          refresh
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>

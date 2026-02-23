@@ -1,18 +1,15 @@
-2026-02-23 18:06:14 - INFO - ============================================================
-2026-02-23 18:06:14 - INFO - Starting market_data_feeder simulator
-2026-02-23 18:06:14 - INFO -   API Base: http://localhost:8000/api/v1
-2026-02-23 18:06:14 - INFO -   Data File: ./data/market_data.csv
-2026-02-23 18:06:14 - INFO -   Heartbeat Interval: 30s
-2026-02-23 18:06:14 - INFO -   File Update Interval: 240s
-2026-02-23 18:06:14 - INFO - ============================================================
-2026-02-23 18:06:14 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:06:14 - INFO - File updated: ./data/market_data.csv - Added MSFT @ $212.17
-2026-02-23 18:06:44 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:07:14 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:07:44 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:08:14 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:08:44 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:09:14 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:09:44 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:10:14 - INFO - Heartbeat sent: market_data_feeder (level=2)
-2026-02-23 18:10:14 - INFO - File updated: ./data/market_data.csv - Added GOOGL @ $202.84
+2026-02-23 19:10:36 - INFO - ============================================================
+2026-02-23 19:10:36 - INFO - Starting market_data_feeder simulator
+2026-02-23 19:10:36 - INFO -   API Base: http://localhost:8000/api/v1
+2026-02-23 19:10:36 - INFO -   Data File: ./data/market_data.csv
+2026-02-23 19:10:36 - INFO -   Heartbeat Interval: 30s
+2026-02-23 19:10:36 - INFO -   File Update Interval: 240s
+2026-02-23 19:10:36 - INFO - ============================================================
+2026-02-23 19:10:36 - INFO - Heartbeat sent: market_data_feeder (level=2)
+2026-02-23 19:10:36 - INFO - File updated: ./data/market_data.csv - Added GOOGL @ $420.45
+2026-02-23 19:11:06 - INFO - Heartbeat sent: market_data_feeder (level=2)
+2026-02-23 19:11:36 - INFO - Heartbeat sent: market_data_feeder (level=2)
+2026-02-23 19:12:06 - INFO - Heartbeat sent: market_data_feeder (level=2)
+2026-02-23 19:12:36 - INFO - Heartbeat sent: market_data_feeder (level=2)
+2026-02-23 19:13:06 - INFO - Heartbeat sent: market_data_feeder (level=2)
+2026-02-23 19:13:36 - INFO - Heartbeat sent: market_data_feeder (level=2)

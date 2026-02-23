@@ -1,114 +1,147 @@
 <template>
-  <div class="status-board">
-    <div class="header">
-      <h2>交易组件监控面板</h2>
-      <div class="controls">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="搜索组件..."
-          class="search-input"
-        />
-        <button @click="fetchData" class="refresh-btn" :disabled="loading">
-          {{ loading ? '刷新中...' : '手动刷新' }}
-        </button>
+  <div class="dashboard">
+    <!-- 左侧菜单栏 -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">◆</span>
+        <span>Monitor</span>
       </div>
-    </div>
-
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>组件 ID</th>
-            <th>心跳状态</th>
-            <th>文件更新</th>
-            <th>运行等级</th>
-            <th>整体健康</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="comp in filteredComponents"
-            :key="comp.component_id"
-            class="component-row"
-          >
-            <td class="component-id">{{ comp.component_id }}</td>
-            
-            <td>
-              <div class="status-cell">
-                <span :class="['status-dot', getHeartbeatClass(comp)]"></span>
-                <span :class="['status-text', getHeartbeatTextClass(comp)]">
-                  {{ getHeartbeatText(comp) }}
-                </span>
-                <span v-if="comp.heartbeat?.last_heartbeat_at" class="time-hint">
-                  {{ formatTime(comp.heartbeat.last_heartbeat_at) }}
-                </span>
-              </div>
-            </td>
-
-            <td>
-              <div v-if="comp.file_status" class="file-status">
-                <div 
-                  class="status-cell file-cell"
-                  @mouseenter="showFileTooltip($event, comp)"
-                  @mouseleave="hideFileTooltip"
-                >
-                  <span :class="['status-dot', comp.file_status.overall_file_health ? 'dot-success' : 'dot-error']"></span>
-                  <span :class="['status-text', comp.file_status.overall_file_health ? 'text-success' : 'text-error']">
-                    {{ comp.file_status.overall_file_health ? '正常' : '异常' }}
-                  </span>
-                </div>
-              </div>
-              <span v-else class="dash">—</span>
-            </td>
-
-            <td>
-              <div v-if="comp.level_status" class="status-cell">
-                <span :class="['status-dot', comp.level_status.compliant ? 'dot-success' : 'dot-warning']"></span>
-                <span :class="['status-text', comp.level_status.compliant ? 'text-success' : 'text-warning']">
-                  {{ comp.level_status.compliant ? '合规' : '违规' }}
-                </span>
-                <span class="level-hint">
-                  {{ comp.level_status.observed_level || '?' }} / {{ comp.level_status.expected_level }}
-                </span>
-              </div>
-              <span v-else class="dash">—</span>
-            </td>
-
-            <td>
-              <div class="status-cell">
-                <span :class="['status-dot', getOverallHealthClass(comp) === 'health-good' ? 'dot-success' : 'dot-error']"></span>
-                <span :class="['status-text', getOverallHealthClass(comp) === 'health-good' ? 'text-success' : 'text-error']">
-                  {{ getOverallHealthText(comp) }}
-                </span>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="footer">
-      <span>最后更新: {{ lastUpdateTime }}</span>
-      <span class="count">共 {{ filteredComponents.length }} 个组件</span>
-    </div>
-
-    <!-- 文件详情 Tooltip -->
-    <div 
-      v-if="tooltip.visible" 
-      class="file-tooltip"
-      :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
-    >
-      <div class="tooltip-title">文件详情</div>
-      <div v-for="(file, idx) in tooltip.files" :key="idx" class="tooltip-item">
-        <div class="tooltip-path">{{ file.path }}</div>
-        <div class="tooltip-time">
-          修改时间: {{ file.last_modified ? formatTime(file.last_modified) : '从未' }}
+      <nav class="sidebar-nav">
+        <div 
+          v-for="item in menuItems" 
+          :key="item.id"
+          :class="['nav-item', { active: activeMenu === item.id }]"
+          @click="activeMenu = item.id"
+        >
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span class="nav-text">{{ item.label }}</span>
         </div>
-        <div :class="['tooltip-status', file.is_compliant ? 'success' : 'error']">
-          {{ file.is_compliant ? '✓ 合规' : '✗ 不合规' }}
+      </nav>
+    </aside>
+
+    <!-- 主区域 -->
+    <div class="main-area">
+      <!-- 顶部导航栏 -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-title">Components</h1>
         </div>
-      </div>
+        <div class="topbar-center">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input 
+              v-model="searchQuery" 
+              type="text" 
+              placeholder="搜索组件..."
+            />
+          </div>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn refresh-btn" @click="fetchData" :disabled="loading">
+            <span :class="{ spinning: loading }">↻</span>
+          </button>
+          <button class="icon-btn">🔔</button>
+          <div class="user-avatar">U</div>
+          <div class="datetime">{{ currentTime }}</div>
+        </div>
+      </header>
+
+      <!-- 主内容区 -->
+      <main class="content">
+        <div class="content-header">
+          <div class="stats-cards">
+            <div class="stat-card total">
+              <div class="stat-value">{{ components.length }}</div>
+              <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-card healthy">
+              <div class="stat-value">{{ healthyCount }}</div>
+              <div class="stat-label">Healthy</div>
+            </div>
+            <div class="stat-card warning">
+              <div class="stat-value">{{ warningCount }}</div>
+              <div class="stat-label">Warning</div>
+            </div>
+            <div class="stat-card critical">
+              <div class="stat-value">{{ criticalCount }}</div>
+              <div class="stat-label">Critical</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Component ID</th>
+                <th>Heartbeat</th>
+                <th>Files</th>
+                <th>Level</th>
+                <th>Health</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                v-for="comp in filteredComponents" 
+                :key="comp.component_id"
+                :class="['component-row', getRowHealthClass(comp)]"
+              >
+                <td class="component-id">{{ comp.component_id }}</td>
+                <td>
+                  <div class="status-badge" :class="getHeartbeatClass(comp)">
+                    <span class="status-dot"></span>
+                    <span>{{ getHeartbeatText(comp) }}</span>
+                    <span v-if="comp.heartbeat?.last_heartbeat_at" class="time-tag">
+                      {{ formatTimeShort(comp.heartbeat.last_heartbeat_at) }}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <div v-if="comp.file_status" class="status-badge" :class="comp.file_status.overall_file_health ? 'status-ok' : 'status-error'">
+                    <span class="status-dot"></span>
+                    <span>{{ comp.file_status.overall_file_health ? 'OK' : 'Error' }}</span>
+                  </div>
+                  <span v-else class="status-unknown">—</span>
+                </td>
+                <td>
+                  <div v-if="comp.level_status" class="status-badge" :class="getLevelClass(comp)">
+                    <span class="status-dot"></span>
+                    <span>{{ comp.level_status.compliant ? 'Compliant' : 'Violation' }}</span>
+                    <span class="level-badge">{{ comp.level_status.observed_level || '?' }}/{{ comp.level_status.expected_level }}</span>
+                  </div>
+                  <span v-else class="status-unknown">—</span>
+                </td>
+                <td>
+                  <div class="health-indicator" :class="getOverallHealthClass(comp)">
+                    <span class="health-icon">{{ getOverallHealthClass(comp) === 'health-good' ? '🟢' : '🔴' }}</span>
+                    <span>{{ getOverallHealthClass(comp) === 'health-good' ? 'Healthy' : 'Critical' }}</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+
+      <!-- 底部状态栏 -->
+      <footer class="statusbar">
+        <div class="statusbar-left">
+          <span class="status-item">Last Update: {{ lastUpdateTime }}</span>
+        </div>
+        <div class="statusbar-center">
+          <span class="status-item">Total: {{ components.length }}</span>
+          <span class="status-separator">|</span>
+          <span class="status-item healthy">Normal: {{ healthyCount }}</span>
+          <span class="status-separator">|</span>
+          <span class="status-item error">Abnormal: {{ criticalCount }}</span>
+        </div>
+        <div class="statusbar-right">
+          <span class="connection-status" :class="{ connected: isConnected }">
+            <span class="connection-dot"></span>
+            {{ isConnected ? 'Connected' : 'Disconnected' }}
+          </span>
+        </div>
+      </footer>
     </div>
   </div>
 </template>
@@ -119,15 +152,19 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 const components = ref([])
 const searchQuery = ref('')
 const lastUpdateTime = ref('—')
+const currentTime = ref('')
 const loading = ref(false)
+const isConnected = ref(true)
+const activeMenu = ref('components')
 const timer = ref(null)
+const timeTimer = ref(null)
 
-const tooltip = ref({
-  visible: false,
-  x: 0,
-  y: 0,
-  files: []
-})
+const menuItems = [
+  { id: 'components', label: 'Components', icon: '◈' },
+  { id: 'files', label: 'Files', icon: '◫' },
+  { id: 'alerts', label: 'Alerts', icon: '◉' },
+  { id: 'settings', label: 'Settings', icon: '◐' }
+]
 
 // 获取数据
 const fetchData = async () => {
@@ -140,20 +177,41 @@ const fetchData = async () => {
     
     const data = await res.json()
     components.value = data.components || []
-    lastUpdateTime.value = new Date().toLocaleString()
+    lastUpdateTime.value = formatDateTime(new Date())
+    isConnected.value = true
   } catch (err) {
     console.error('Failed to fetch status:', err)
-    alert('网络错误: ' + err.message)
+    isConnected.value = false
+    alert('Network error: ' + err.message)
   } finally {
     loading.value = false
   }
 }
 
-// 过滤和排序
+// 更新当前时间
+const updateCurrentTime = () => {
+  currentTime.value = formatDateTime(new Date())
+}
+
+const formatDateTime = (date) => {
+  const pad = (n) => n.toString().padStart(2, '0')
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const formatTimeShort = (isoString) => {
+  if (!isoString) return ''
+  try {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  } catch {
+    return ''
+  }
+}
+
+// 过滤和排序组件
 const filteredComponents = computed(() => {
   let result = components.value
   
-  // 搜索过滤
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(c => c.component_id?.toLowerCase().includes(query))
@@ -167,28 +225,42 @@ const filteredComponents = computed(() => {
   })
 })
 
-// 心跳状态相关
-const getHeartbeatClass = (comp) => {
-  if (!comp.heartbeat) return 'dot-none'
-  if (comp.heartbeat.status === 'healthy') return 'dot-success'
-  if (comp.heartbeat.status === 'warning') return 'dot-warning'
-  return 'dot-error'
-}
+// 统计数量
+const healthyCount = computed(() => 
+  components.value.filter(c => getOverallHealthClass(c) === 'health-good').length
+)
 
-const getHeartbeatTextClass = (comp) => {
-  if (!comp.heartbeat) return 'text-muted'
-  if (comp.heartbeat.status === 'healthy') return 'text-success'
-  if (comp.heartbeat.status === 'warning') return 'text-warning'
-  return 'text-error'
+const warningCount = computed(() => 
+  components.value.filter(c => {
+    const hb = c.heartbeat?.status
+    return hb === 'warning' && getOverallHealthClass(c) !== 'health-good'
+  }).length
+)
+
+const criticalCount = computed(() => 
+  components.value.filter(c => getOverallHealthClass(c) !== 'health-good').length
+)
+
+// 状态判断函数
+const getHeartbeatClass = (comp) => {
+  if (!comp.heartbeat) return 'status-unknown'
+  if (comp.heartbeat.status === 'healthy') return 'status-ok'
+  if (comp.heartbeat.status === 'warning') return 'status-warning'
+  return 'status-error'
 }
 
 const getHeartbeatText = (comp) => {
-  if (!comp.heartbeat) return '未知'
-  if (comp.heartbeat.status === 'healthy') return '存活'
-  return '宕机'
+  if (!comp.heartbeat) return 'Unknown'
+  if (comp.heartbeat.status === 'healthy') return 'Alive'
+  return 'Down'
 }
 
-// 整体健康
+const getLevelClass = (comp) => {
+  if (!comp.level_status) return 'status-unknown'
+  if (comp.level_status.compliant) return 'status-ok'
+  return 'status-warning'
+}
+
 const getOverallHealthClass = (comp) => {
   const hbOk = comp.heartbeat?.status === 'healthy'
   const fileOk = comp.file_status?.overall_file_health !== false
@@ -197,153 +269,318 @@ const getOverallHealthClass = (comp) => {
   return hbOk && fileOk && levelOk ? 'health-good' : 'health-bad'
 }
 
-const getOverallHealthText = (comp) => {
-  return getOverallHealthClass(comp) === 'health-good' ? '正常' : '异常'
+const getRowHealthClass = (comp) => {
+  return getOverallHealthClass(comp) === 'health-good' ? 'row-healthy' : 'row-critical'
 }
 
-// 文件 tooltip
-const showFileTooltip = (event, comp) => {
-  if (!comp.file_status) return
-  
-  const files = []
-  
-  // 收集输入文件
-  if (comp.file_status.input_files) {
-    comp.file_status.input_files.forEach(f => {
-      files.push({ ...f, type: '输入' })
-    })
-  }
-  
-  // 收集输出文件
-  if (comp.file_status.output_files) {
-    comp.file_status.output_files.forEach(f => {
-      files.push({ ...f, type: '输出' })
-    })
-  }
-  
-  tooltip.value = {
-    visible: true,
-    x: event.clientX + 10,
-    y: event.clientY + 10,
-    files
-  }
-}
-
-const hideFileTooltip = () => {
-  tooltip.value.visible = false
-}
-
-// 时间格式化
-const formatTime = (isoString) => {
-  if (!isoString) return '—'
-  try {
-    const date = new Date(isoString)
-    return date.toLocaleString()
-  } catch {
-    return isoString
-  }
-}
-
-// 生命周期
 onMounted(() => {
   fetchData()
   timer.value = setInterval(fetchData, 10000)
+  updateCurrentTime()
+  timeTimer.value = setInterval(updateCurrentTime, 1000)
 })
 
 onUnmounted(() => {
   if (timer.value) clearInterval(timer.value)
+  if (timeTimer.value) clearInterval(timeTimer.value)
 })
 </script>
 
 <style scoped>
-.status-board {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+  background: #0a1028;
+  color: #e8ecf4;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f5f7fa;
+}
+
+/* 左侧菜单栏 */
+.sidebar {
+  width: 200px;
+  background: #0d1430;
+  border-right: 1px solid #1a2547;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #00d4ff;
+  border-bottom: 1px solid #1a2547;
+}
+
+.logo-icon {
+  font-size: 24px;
+  color: #00d4ff;
+}
+
+.sidebar-nav {
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #8b9dc3;
+}
+
+.nav-item:hover {
+  background: #1a2547;
+  color: #e8ecf4;
+}
+
+.nav-item.active {
+  background: #00d4ff22;
+  color: #00d4ff;
+}
+
+.nav-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.nav-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 主区域 */
+.main-area {
+  flex: 1;
+  margin-left: 200px;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
-.header {
+/* 顶部导航栏 */
+.topbar {
+  height: 64px;
+  background: #0d1430;
+  border-bottom: 1px solid #1a2547;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #e8ecf4;
+}
+
+.topbar-center {
+  flex: 1;
+  max-width: 400px;
+  margin: 0 24px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  background: #1a2547;
+  border: 1px solid #2a3655;
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 40px;
+}
+
+.search-icon {
+  color: #8b9dc3;
+  margin-right: 8px;
+}
+
+.search-box input {
+  background: transparent;
+  border: none;
+  color: #e8ecf4;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+}
+
+.search-box input::placeholder {
+  color: #5a6a8a;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
   gap: 16px;
 }
 
-h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-input {
-  padding: 10px 16px;
-  border: 1px solid #ddd;
+.icon-btn {
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
-  font-size: 14px;
-  width: 200px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.search-input:focus {
-  border-color: #409eff;
-}
-
-.refresh-btn {
-  padding: 10px 20px;
-  background: #409eff;
-  color: white;
   border: none;
-  border-radius: 8px;
+  background: #1a2547;
+  color: #8b9dc3;
   cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s;
 }
 
-.refresh-btn:hover:not(:disabled) {
-  background: #66b1ff;
+.icon-btn:hover {
+  background: #2a3655;
+  color: #e8ecf4;
 }
 
 .refresh-btn:disabled {
-  background: #a0cfff;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.table-container {
-  background: white;
+.spinning {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00d4ff, #0099cc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+.datetime {
+  font-size: 13px;
+  color: #8b9dc3;
+  font-family: 'SF Mono', monospace;
+}
+
+/* 主内容区 */
+.content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.content-header {
+  margin-bottom: 24px;
+}
+
+.stats-cards {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: #0d1430;
+  border: 1px solid #1a2547;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 20px 24px;
+  min-width: 120px;
+  text-align: center;
+}
+
+.stat-card.total {
+  border-color: #3a4a6a;
+}
+
+.stat-card.healthy {
+  border-color: #00d4ff;
+  background: #00d4ff11;
+}
+
+.stat-card.warning {
+  border-color: #f5a623;
+  background: #f5a62311;
+}
+
+.stat-card.critical {
+  border-color: #ff4757;
+  background: #ff475711;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #e8ecf4;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #8b9dc3;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* 表格 */
+.table-container {
+  background: #0d1430;
+  border: 1px solid #1a2547;
+  border-radius: 12px;
   overflow: hidden;
 }
 
-table {
+.data-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-thead {
-  background: #f8f9fa;
+.data-table thead {
+  background: #1a2547;
 }
 
-th {
+.data-table th {
   padding: 16px 20px;
   text-align: left;
+  font-size: 12px;
   font-weight: 600;
-  color: #606266;
+  color: #8b9dc3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #1a2547;
   font-size: 14px;
-  border-bottom: 1px solid #ebeef5;
 }
 
 .component-row {
@@ -351,168 +588,195 @@ th {
 }
 
 .component-row:hover {
-  background: #f5f7fa;
+  background: #1a2547;
 }
 
-td {
-  padding: 16px 20px;
-  border-bottom: 1px solid #ebeef5;
-  font-size: 14px;
+.component-row.row-critical {
+  background: #ff475711;
+}
+
+.component-row.row-critical:hover {
+  background: #ff475722;
 }
 
 .component-id {
-  font-weight: 500;
-  color: #303133;
+  font-family: 'SF Mono', monospace;
+  font-weight: 600;
+  color: #00d4ff;
 }
 
-.status-cell {
-  display: flex;
+/* 状态徽章 */
+.status-badge {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  flex-shrink: 0;
 }
 
-.dot-success {
-  background: #67c23a;
+.status-ok {
+  background: #00d4ff22;
+  color: #00d4ff;
 }
 
-.dot-error {
-  background: #f56c6c;
+.status-ok .status-dot {
+  background: #00d4ff;
+  box-shadow: 0 0 8px #00d4ff;
 }
 
-.dot-warning {
-  background: #e6a23c;
+.status-error {
+  background: #ff475722;
+  color: #ff4757;
 }
 
-.dot-none {
-  background: #c0c4cc;
+.status-error .status-dot {
+  background: #ff4757;
+  box-shadow: 0 0 8px #ff4757;
 }
 
-.status-text {
-  font-weight: 500;
+.status-warning {
+  background: #f5a62322;
+  color: #f5a623;
 }
 
-.text-success {
-  color: #67c23a;
+.status-warning .status-dot {
+  background: #f5a623;
 }
 
-.text-error {
-  color: #f56c6c;
+.status-unknown {
+  color: #5a6a8a;
 }
 
-.text-warning {
-  color: #e6a23c;
-}
-
-.text-muted {
-  color: #909399;
-}
-
-.time-hint {
-  font-size: 12px;
-  color: #909399;
+.time-tag {
+  font-size: 11px;
+  color: #8b9dc3;
   margin-left: 8px;
+  font-family: 'SF Mono', monospace;
 }
 
-.level-hint {
-  font-size: 12px;
-  color: #606266;
-  background: #f4f4f5;
+.level-badge {
+  background: #1a2547;
   padding: 2px 8px;
   border-radius: 4px;
+  font-size: 11px;
   margin-left: 8px;
+  color: #8b9dc3;
 }
 
-.file-cell {
-  cursor: help;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.file-cell:hover {
-  background: #e6f2ff;
-}
-
-.dash {
-  color: #c0c4cc;
-}
-
-.footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 16px;
-  font-size: 13px;
-  color: #909399;
-}
-
-.count {
-  font-weight: 500;
-}
-
-/* Tooltip */
-.file-tooltip {
-  position: fixed;
-  background: white;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  max-width: 400px;
-  min-width: 300px;
-}
-
-.tooltip-title {
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 12px;
-  color: #303133;
-  border-bottom: 1px solid #ebeef5;
-  padding-bottom: 8px;
 }
 
-.tooltip-item {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
+.health-indicator.health-good {
+  color: #00d4ff;
 }
 
-.tooltip-item:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
+.health-indicator.health-bad {
+  color: #ff4757;
 }
 
-.tooltip-path {
+.health-icon {
+  font-size: 16px;
+}
+
+/* 底部状态栏 */
+.statusbar {
+  height: 48px;
+  background: #0d1430;
+  border-top: 1px solid #1a2547;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
   font-size: 13px;
-  color: #606266;
-  word-break: break-all;
-  margin-bottom: 4px;
 }
 
-.tooltip-time {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 4px;
+.statusbar-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.tooltip-status {
-  font-size: 12px;
-  font-weight: 500;
+.status-item {
+  color: #8b9dc3;
 }
 
-.tooltip-status.success {
-  color: #67c23a;
+.status-item.healthy {
+  color: #00d4ff;
 }
 
-.tooltip-status.error {
-  color: #f56c6c;
+.status-item.error {
+  color: #ff4757;
+}
+
+.status-separator {
+  color: #3a4a6a;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ff4757;
+}
+
+.connection-status.connected {
+  color: #00d4ff;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 64px;
+  }
+  
+  .nav-text {
+    display: none;
+  }
+  
+  .main-area {
+    margin-left: 64px;
+  }
+  
+  .sidebar-logo span:last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar-center {
+    display: none;
+  }
+  
+  .stats-cards {
+    justify-content: center;
+  }
+  
+  .stat-card {
+    min-width: 80px;
+    padding: 16px;
+  }
+  
+  .stat-value {
+    font-size: 24px;
+  }
 }
 </style>
