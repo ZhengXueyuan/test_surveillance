@@ -1,0 +1,13 @@
+# file_monitor_plan.yaml
+components:
+  - component_id: "trade_engine"
+    input_files:
+      - path: "/data/market_data.csv"
+        expected_update_cron: "0 */5 * * *"   # 每5分钟应更新
+    output_files:
+      - path: "/logs/trade_engine.log"
+        expected_update_cron: "*/1 * * * *"   # 每分钟应有新日志
+  - component_id: "risk_checker"
+    input_files:
+      - path: "/config/risk_rules.json"
+        expected_update_cron: "0 2 * * *"     # 每天凌晨2点更新

@@ -1,0 +1,18 @@
+# level_schedule.yaml
+schedules:
+  - component_id: "trade_engine"
+    rules:
+      - start_time: "09:00"
+        end_time: "15:30"
+        expected_level: 4   # 正常交易时段
+      - start_time: "15:30"
+        end_time: "09:00"
+        expected_level: 1   # 非交易时段仅保持进程存活
+  - component_id: "market_data_feeder"
+    rules:
+      - start_time: "08:00"
+        end_time: "17:00"
+        expected_level: 4
+      - start_time: "17:00"
+        end_time: "08:00"
+        expected_level: 2   # 夜间保持连接但不交易
