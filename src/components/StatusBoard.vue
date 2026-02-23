@@ -72,6 +72,21 @@
           </div>
         </div>
 
+        <!-- 趋势图区域 -->
+        <div class="chart-section">
+          <div class="chart-header">
+            <h3>Health Trend</h3>
+            <select v-model="selectedComponent" class="component-select">
+              <option v-for="comp in components" :key="comp.component_id" :value="comp.component_id">
+                {{ comp.component_id }}
+              </option>
+            </select>
+          </div>
+          <div class="chart-container">
+            <canvas ref="chartCanvas"></canvas>
+          </div>
+        </div>
+
         <div class="table-container">
           <table class="data-table">
             <thead>
@@ -150,7 +165,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, shallowRef } from 'vue'
 
 const components = ref([])
 const searchQuery = ref('')
@@ -161,6 +176,13 @@ const isConnected = ref(true)
 const activeMenu = ref('components')
 const timer = ref(null)
 const timeTimer = ref(null)
+const chartTimer = ref(null)
+const chartCanvas = ref(null)
+const selectedComponent = ref('')
+const chartInstance = shallowRef(null)
+
+// 使用普通对象存储历史数据，避免 Vue 响应式与 Chart.js 冲突
+let historyData = {}
 
 const menuItems = [
   { id: 'components', label: 'Components', icon: '◈' },
@@ -181,6 +203,11 @@ const fetchData = async () => {
     const data = await res.json()
     components.value = data.components || []
     lastUpdateTime.value = formatDateTime(new Date())
+    
+    // 如果还没有选中组件，默认选第一个
+    if (components.value.length > 0 && !selectedComponent.value) {
+      selectedComponent.value = components.value[0].component_id
+    }
     isConnected.value = true
   } catch (err) {
     console.error('Failed to fetch status:', err)
@@ -339,16 +366,157 @@ const exportToCsv = () => {
   URL.revokeObjectURL(url)
 }
 
-onMounted(() => {
-  fetchData()
+// 更新历史数据
+const updateHistoryData = () => {
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  
+  // 先将组件数据转换为普通对象，避免响应式污染
+  const plainComponents = components.value.map(comp => ({
+    component_id: comp.component_id,
+    heartbeat_status: comp.heartbeat?.status,
+    file_health: comp.file_status?.overall_file_health,
+    level_compliant: comp.level_status?.compliant
+  }))
+  
+  plainComponents.forEach(comp => {
+    const id = comp.component_id
+    if (!historyData[id]) {
+      historyData[id] = { labels: [], data: [] }
+    }
+    
+    const history = historyData[id]
+    history.labels.push(now)
+    
+    // 直接计算分数，避免访问响应式对象
+    let score = 0
+    if (comp.heartbeat_status === 'healthy') score += 40
+    if (comp.file_health) score += 30
+    if (comp.level_compliant) score += 30
+    history.data.push(score)
+    
+    // 只保留最近 20 个数据点
+    if (history.labels.length > 20) {
+      history.labels.shift()
+      history.data.shift()
+    }
+  })
+  
+  // 更新图表
+  updateChart()
+}
+
+// 初始化图表
+const initChart = () => {
+  if (!chartCanvas.value || chartInstance.value) return
+  
+  const ctx = chartCanvas.value.getContext('2d')
+  
+  // 创建完全独立的数据对象，避免 Vue 响应式污染
+  const chartData = {
+    labels: [],
+    datasets: [{
+      label: 'Health Score',
+      data: [],
+      borderColor: '#00d4ff',
+      backgroundColor: 'rgba(0, 212, 255, 0.1)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointBackgroundColor: '#00d4ff'
+    }]
+  }
+  
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2547',
+        titleColor: '#e8ecf4',
+        bodyColor: '#e8ecf4',
+        borderColor: '#00d4ff',
+        borderWidth: 1,
+        displayColors: false
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1a2547' },
+        ticks: { color: '#8b9dc3', maxTicksLimit: 6 }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: { color: '#1a2547' },
+        ticks: { color: '#8b9dc3', stepSize: 20 }
+      }
+    }
+  }
+  
+  chartInstance.value = new window.Chart(ctx, {
+    type: 'line',
+    data: chartData,
+    options: chartOptions
+  })
+}
+
+// 更新图表
+const updateChart = () => {
+  if (!chartInstance.value || !selectedComponent.value) return
+  
+  const history = historyData[selectedComponent.value]
+  if (!history || history.labels.length === 0) return
+  
+  // 完全解耦数据，避免 Vue 响应式污染
+  const labels = JSON.parse(JSON.stringify(history.labels))
+  const data = JSON.parse(JSON.stringify(history.data))
+  
+  chartInstance.value.data.labels = labels
+  chartInstance.value.data.datasets[0].data = data
+  chartInstance.value.update()
+}
+
+// 监听组件选择变化
+watch(selectedComponent, () => {
+  updateChart()
+})
+
+onMounted(async () => {
+  await fetchData()
   timer.value = setInterval(fetchData, 10000)
   updateCurrentTime()
   timeTimer.value = setInterval(updateCurrentTime, 1000)
+  
+  // 等待 DOM 完全渲染后再初始化图表
+  await nextTick()
+  
+  setTimeout(() => {
+    // 设置默认选中的组件
+    if (components.value.length > 0 && !selectedComponent.value) {
+      selectedComponent.value = components.value[0].component_id
+    }
+    
+    // 初始化图表
+    initChart()
+    
+    // 立即记录一次历史数据
+    if (selectedComponent.value) {
+      updateHistoryData()
+    }
+  }, 100)
+  
+  // 启动历史数据记录
+  chartTimer.value = setInterval(updateHistoryData, 10000)
 })
 
 onUnmounted(() => {
   if (timer.value) clearInterval(timer.value)
   if (timeTimer.value) clearInterval(timeTimer.value)
+  if (chartTimer.value) clearInterval(chartTimer.value)
+  if (chartInstance.value) chartInstance.value.destroy()
 })
 </script>
 
@@ -633,6 +801,51 @@ onUnmounted(() => {
   color: #8b9dc3;
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+/* 图表区域 */
+.chart-section {
+  background: #0d1430;
+  border: 1px solid #1a2547;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chart-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8ecf4;
+  margin: 0;
+}
+
+.component-select {
+  padding: 8px 16px;
+  background: #1a2547;
+  border: 1px solid #2a3655;
+  border-radius: 8px;
+  color: #e8ecf4;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  min-width: 180px;
+}
+
+.component-select option {
+  background: #0d1430;
+  color: #e8ecf4;
+}
+
+.chart-container {
+  height: 280px;
+  position: relative;
 }
 
 /* 表格 */
