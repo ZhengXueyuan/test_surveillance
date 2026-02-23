@@ -37,6 +37,9 @@
           </div>
         </div>
         <div class="topbar-right">
+          <button class="export-btn" @click="exportToCsv">
+            <span>⬇</span> Export CSV
+          </button>
           <button class="icon-btn refresh-btn" @click="fetchData" :disabled="loading">
             <span :class="{ spinning: loading }">↻</span>
           </button>
@@ -273,6 +276,69 @@ const getRowHealthClass = (comp) => {
   return getOverallHealthClass(comp) === 'health-good' ? 'row-healthy' : 'row-critical'
 }
 
+// 获取文件状态文本
+const getFileStatusText = (comp) => {
+  if (!comp.file_status) return 'Unknown'
+  return comp.file_status.overall_file_health ? 'OK' : 'Error'
+}
+
+// 获取等级合规文本
+const getLevelStatusText = (comp) => {
+  if (!comp.level_status) return 'Unknown'
+  return comp.level_status.compliant ? 'Compliant' : 'Violation'
+}
+
+// 获取整体健康文本
+const getOverallHealthText = (comp) => {
+  return getOverallHealthClass(comp) === 'health-good' ? 'Healthy' : 'Critical'
+}
+
+// 导出 CSV
+const exportToCsv = () => {
+  if (filteredComponents.value.length === 0) {
+    alert('No data to export')
+    return
+  }
+
+  // CSV 头部
+  const headers = ['Component ID', 'Heartbeat', 'File Update', 'Level Compliance', 'Overall Health']
+  
+  // CSV 数据行
+  const rows = filteredComponents.value.map(comp => [
+    comp.component_id,
+    getHeartbeatText(comp),
+    getFileStatusText(comp),
+    getLevelStatusText(comp),
+    getOverallHealthText(comp)
+  ])
+  
+  // 组合 CSV 内容
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.join(','))
+  ].join('\n')
+  
+  // 创建 Blob
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  
+  // 创建下载链接
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  
+  // 设置文件名（包含时间戳）
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+  link.setAttribute('href', url)
+  link.setAttribute('download', `component-status-${timestamp}.csv`)
+  
+  // 触发下载
+  document.body.appendChild(link)
+  link.click()
+  
+  // 清理
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 onMounted(() => {
   fetchData()
   timer.value = setInterval(fetchData, 10000)
@@ -455,6 +521,25 @@ onUnmounted(() => {
 .icon-btn:hover {
   background: #2a3655;
   color: #e8ecf4;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #00d4ff22;
+  border: 1px solid #00d4ff;
+  border-radius: 8px;
+  color: #00d4ff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background: #00d4ff44;
 }
 
 .refresh-btn:disabled {
