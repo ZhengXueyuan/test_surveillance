@@ -52,13 +52,13 @@ components:
     description: "市场数据接入网关"
 
     input_files:
-      - path: "/config/exchange_endpoints.json"
+      - path: "./config/exchange_endpoints.json"
         description: "交易所接口配置"
         expected_update_cron: "0 1 * * 1"
         grace_period_sec: 3600
 
     output_files:
-      - path: "/data/market_data.csv"
+      - path: "./data/market_data.csv"
         description: "标准化市场数据"
-        expected_update_cron: "*/30 * * * * *"
-        grace_period_sec: 15
+        expected_update_cron: "*/5 * * * *"
+        grace_period_sec: 60

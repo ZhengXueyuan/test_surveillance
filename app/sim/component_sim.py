@@ -3,7 +3,7 @@
 import argparse
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -34,9 +34,10 @@ class SimulatedComponent:
         """
         url = f"{self.api_base}/heartbeat/{self.component_id}"
 
+        # 使用带时区的时间戳（UTC）
         payload = {
             "process_exists": self.process_exists,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # 只有等级有效时才添加

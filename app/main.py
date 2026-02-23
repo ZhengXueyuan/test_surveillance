@@ -3,6 +3,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .api import heartbeat, status
 from .core.redis_client import redis_client
@@ -66,6 +67,15 @@ app = FastAPI(
     description="监控模拟交易组件的心跳、文件更新和运行等级",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# 配置 CORS - 允许前端开发服务器访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite 默认端口
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 注册路由
